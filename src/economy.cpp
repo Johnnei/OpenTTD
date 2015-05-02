@@ -436,6 +436,25 @@ void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner)
 			if (v->owner == old_owner && IsCompanyBuildableVehicleType(v->type)) {
 				assert(new_owner != INVALID_OWNER);
 
+				/* Verify the service interval settings for mismatching defaults */
+				Company *old_company = Company::Get(old_owner);
+				Company *new_company = Company::Get(new_owner);
+
+				if (old_company->settings.vehicle.servint_ispercent != new_company->settings.vehicle.servint_ispercent) {
+					/* If the service interval types (day/percent) the value gets interpeted incorrectly.
+					 * When the vehicle gets auto replaced this value will get accepted for whatever the setting happens to be.
+					 * This could cause 150% intervals which is normally not valid.
+					 */
+
+					uint16 interval = GetServiceIntervalClamped(v->GetServiceInterval(), old_company->settings.vehicle.servint_ispercent);
+					CommandCost res = DoCommand(v->tile, v->index, interval | (1 << 16) | (old_company->settings.vehicle.servint_ispercent << 17), DC_EXEC | DC_BANKRUPT, CMD_CHANGE_SERVICE_INT);
+					if (res.Failed()) {
+						res.GetErrorMessage();
+					}
+					// v->SetServiceIntervalIsCustom(true);
+					// v->SetServiceIntervalIsPercent(old_company->settings.vehicle.servint_ispercent);
+				}
+
 				v->owner = new_owner;
 
 				/* Owner changes, clear cache */
