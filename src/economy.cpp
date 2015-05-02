@@ -444,15 +444,11 @@ void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner)
 					/* If the service interval types (day/percent) the value gets interpeted incorrectly.
 					 * When the vehicle gets auto replaced this value will get accepted for whatever the setting happens to be.
 					 * This could cause 150% intervals which is normally not valid.
+					 * Forcibly adjust the vehicle to the same settings but with the VF_SERVINT_IS_CUSTOM enabled
 					 */
 
 					uint16 interval = GetServiceIntervalClamped(v->GetServiceInterval(), old_company->settings.vehicle.servint_ispercent);
-					CommandCost res = DoCommand(v->tile, v->index, interval | (1 << 16) | (old_company->settings.vehicle.servint_ispercent << 17), DC_EXEC | DC_BANKRUPT, CMD_CHANGE_SERVICE_INT);
-					if (res.Failed()) {
-						res.GetErrorMessage();
-					}
-					// v->SetServiceIntervalIsCustom(true);
-					// v->SetServiceIntervalIsPercent(old_company->settings.vehicle.servint_ispercent);
+					DoCommand(v->tile, v->index, interval | (1 << 16) | (old_company->settings.vehicle.servint_ispercent << 17), DC_EXEC | DC_BANKRUPT, CMD_CHANGE_SERVICE_INT);
 				}
 
 				v->owner = new_owner;
