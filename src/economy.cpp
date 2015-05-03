@@ -431,24 +431,36 @@ void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner)
 			FreeUnitIDGenerator(VEH_SHIP,  new_owner), FreeUnitIDGenerator(VEH_AIRCRAFT, new_owner)
 		};
 
+		/* Override company settings to new company defaults in case we need to convert them 
+		 * This is required as the CmdChangeServiceInt doesn't copy the supplied value when it is non-custom
+		 */
+		if (new_owner != INVALID_OWNER) {
+			Company *old_company = Company::Get(old_owner);
+			Company *new_company = Company::Get(new_owner);
+
+			old_company->settings.vehicle.servint_aircraft = new_company->settings.vehicle.servint_aircraft;
+			old_company->settings.vehicle.servint_trains = new_company->settings.vehicle.servint_trains;
+			old_company->settings.vehicle.servint_roadveh = new_company->settings.vehicle.servint_roadveh;
+			old_company->settings.vehicle.servint_ships = new_company->settings.vehicle.servint_ships;
+			old_company->settings.vehicle.servint_ispercent = new_company->settings.vehicle.servint_ispercent;
+		}
+
 		Vehicle *v;
 		FOR_ALL_VEHICLES(v) {
 			if (v->owner == old_owner && IsCompanyBuildableVehicleType(v->type)) {
 				assert(new_owner != INVALID_OWNER);
 
-				/* Verify the service interval settings for mismatching defaults */
-				Company *old_company = Company::Get(old_owner);
-				Company *new_company = Company::Get(new_owner);
+				/* Correct default values of interval settings while maintaining custom set ones 
+				 * This prevents invalid values on mismatching company defaults being accepted (FS#6254)
+				 */
+				if (!v->ServiceIntervalIsCustom()) {
+					Company *new_company = Company::Get(new_owner);
 
-				if (old_company->settings.vehicle.servint_ispercent != new_company->settings.vehicle.servint_ispercent) {
-					/* If the service interval types (day/percent) the value gets interpeted incorrectly.
-					 * When the vehicle gets auto replaced this value will get accepted for whatever the setting happens to be.
-					 * This could cause 150% intervals which is normally not valid.
-					 * Forcibly adjust the vehicle to the same settings but with the VF_SERVINT_IS_CUSTOM enabled
+					/* Sending the interval is not needed as the default settings will request the same value.
+					 * However to not rely on that implementation detail we should still send it to prevent bugs when it changes.
 					 */
-
-					uint16 interval = GetServiceIntervalClamped(v->GetServiceInterval(), old_company->settings.vehicle.servint_ispercent);
-					DoCommand(v->tile, v->index, interval | (1 << 16) | (old_company->settings.vehicle.servint_ispercent << 17), DC_EXEC | DC_BANKRUPT, CMD_CHANGE_SERVICE_INT);
+					int interval = CompanyServiceInterval(new_company, v->type);
+					DoCommand(v->tile, v->index, interval | (new_company->settings.vehicle.servint_ispercent << 17), DC_EXEC | DC_BANKRUPT, CMD_CHANGE_SERVICE_INT);
 				}
 
 				v->owner = new_owner;
